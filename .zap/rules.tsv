@@ -1,0 +1,14 @@
+# ZAP Rules configuration
+# Format: rule_id	IGNORE/WARN/FAIL	description
+#
+# Full list: https://www.zaproxy.org/docs/alerts/
+#
+# 10015 = Incomplete or No Cache-control Header Set      → WARN (informational)
+# 10096 = Timestamp Disclosure                           → WARN
+# 10036 = Server Leaks Version Information               → WARN
+# 90005 = Sec-Fetch-Dest Header is Missing               → WARN (browser-only)
+
+10015	WARN	(Incomplete or No Cache-control Header Set)
+10096	WARN	(Timestamp Disclosure)
+10036	WARN	(Server Leaks Version Information via "Server" HTTP Response Header Field)
+90005	WARN	(Sec-Fetch-Dest Header is Missing)

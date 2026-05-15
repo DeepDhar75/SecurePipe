@@ -1,0 +1,112 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SecurePipe — Local Dev Stack
+# Run: docker compose up -d
+# SonarQube UI: http://localhost:9000 (admin/admin → change on first login)
+# App:          http://localhost:5000
+# ─────────────────────────────────────────────────────────────────────────────
+
+networks:
+  securepipe-net:
+    driver: bridge
+
+volumes:
+  sonar_data:
+  sonar_extensions:
+  sonar_logs:
+  postgres_data:
+
+services:
+  # ─── App ─────────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: securepipe-app
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=postgres
+      - DB_USER=app
+      - DB_PASSWORD=securepassword
+      - DB_NAME=securepipe
+    networks:
+      - securepipe-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    user: "1001:1001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── PostgreSQL ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: securepipe-postgres
+    environment:
+      POSTGRES_DB: securepipe
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: securepassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - securepipe-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d securepipe"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── SonarQube (local) ───────────────────────────────────────────────────
+  sonarqube:
+    image: sonarqube:10-community
+    container_name: securepipe-sonarqube
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://sonar-db:5432/sonar
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=sonar
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_extensions:/opt/sonarqube/extensions
+      - sonar_logs:/opt/sonarqube/logs
+    networks:
+      - securepipe-net
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  sonar-db:
+    image: postgres:15-alpine
+    container_name: securepipe-sonar-db
+    environment:
+      POSTGRES_DB: sonar
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+    volumes:
+      - sonar_data:/var/lib/postgresql/data
+    networks:
+      - securepipe-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
