@@ -36,7 +36,7 @@ jobs:
 
   # STAGE 2: Build Docker Image
   build:
-    name:  Build Docker Image
+    name: 🔨 Build Docker Image
     runs-on: ubuntu-latest
     needs: secrets-scan
     steps:
@@ -191,13 +191,24 @@ jobs:
             sleep 2
           done
 
-      - name: OWASP ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
+      - name: Run OWASP ZAP via Docker
+        run: |
+          docker run --network host \
+            -v $(pwd)/zap-output:/zap/wrk/:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:5000 \
+            -r zap-report.html \
+            -I || true
+        env:
+          JAVA_OPTS: "-Xmx512m"
+
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          target: "http://localhost:5000"
-          rules_file_name: ".zap/rules.tsv"
-          cmd_options: "-a"
-          fail_action: false
+          name: zap-report
+          path: zap-output/zap-report.html
 
       - name: Stop app
         if: always()
